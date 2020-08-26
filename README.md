@@ -4,4 +4,4 @@ Constructs neural networks using tensorflow 2.0 to efficiently estimate the solu
 References:
 
 1. https://doi.org/10.1016/j.jcp.2018.10.045
-2. https://doi.org/10.1016/j.jcp.2018.10.045
+2. https://github.com/maziarraissi/PINNs
