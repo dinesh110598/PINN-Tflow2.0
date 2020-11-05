@@ -32,6 +32,12 @@ sgd_opt = tfk.optimizers.SGD()
 
 @tf.function
 def train_colloc (input_var):
+    """Trains the model to obey the given PDE at collocation points
+
+    Args:
+        input_var: A tf.Tensor of shape (batch_size,2). Components of second index
+                    denote x and t
+    """
     with tf.GradientTape(True, False) as tape:
         tape.watch (PINN.trainable_weights)
         #Calculate various derivatives of the output
@@ -59,9 +65,58 @@ def train_colloc (input_var):
         j = tf.complex(0,1)
 
         MSE = tfm.reduce_euclidean_norm( tfm.abs ((j*h_t) + (0.5*h_xx) + (tfm.conj(h)*h*h)) )
-
-    x = input_var[:, 1]
-    t = input_var[:, 0]
+    
     grads = tape.gradient (MSE, PINN.trainable_weights)
     sgd_opt.apply_gradients (zip(grads,PINN.trainable_weights))
     del tape
+
+@tf.function
+def train_init (input_var):
+    """Trains the model to have a fixed initial condition when t=0
+
+    Args:
+        input_var : A tf.Tensor of shape (batch_size,2). Components of second index
+                    denote x and t. Value of t should always be 0.
+    """
+    with tf.GradientTape() as tape:
+        h = PINN (input_var)
+        MSE = tfm.reduce_euclidean_norm ( tfm.abs(h - sech(input_var[:,1])) )
+    grads = tape.gradient(MSE, PINN.trainable_weights)
+    sgd_opt.apply_gradients(zip(grads, PINN.trainable_weights))
+
+@tf.function
+def train_bound (input_times):
+    """Trains the model to equalize values and spatial derivatives at boundaries x=5 
+    and x=-5 to enforce periodic boundary condition
+
+    Args:
+        input_times : A tf.Tensor of shape (batch_size,). Denotes values of t
+    """
+
+    input_var1 = tf.stack([input_times, 5*tf.ones(input_times.shape)], axis=-1)
+    input_var2 = tf.stack([input_times,-5*tf.ones(input_times.shape)], axis=-1)
+    with tf.GradientTape(True, False) as tape:
+        tape.watch (PINN.trainable_weights)
+        with tf.GradientTape(True, False) as grtape1:
+            grtape1.watch ([input_var1, input_var2])
+            #Automatic differentiation of complex functions is weird in tensorflow
+            #so we differentiate real and imaginary parts seperately
+            h_real_1 = tfm.real(PINN(input_var1))
+            h_imag_1 = tfm.imag(PINN(input_var1))
+            h_real_2 = tfm.real(PINN(input_var2))
+            h_imag_2 = tfm.imag(PINN(input_var2))
+        #First order derivatives
+        h1_real_1 = grtape1.gradient(h_real_1, input_var1)
+        h1_imag_1 = grtape1.gradient(h_imag_1, input_var1)
+        h1_real_2 = grtape1.gradient(h_real_2, input_var2)
+        h1_imag_2 = grtape1.gradient(h_imag_2, input_var2)
+        #h1_real and h1_imag have shape (batch_size,2)
+        del grtape1
+        h1 = tf.complex (h_real_1,h_imag_1)
+        h1_x = tf.complex (h1_real_1[:,1], h1_imag_1[:,1])
+        h2 = tf.complex(h_real_2, h_imag_2)
+        h2_x = tf.complex(h1_real_2[:, 1], h1_imag_2[:, 1])
+        MSE = tfm.reduce_mean(
+                    tfm.pow(tfm.abs(h1-h2),2) + tfm.pow(tfm.abs(h1_x-h2_x),2))
+    grads = tape.gradient(MSE, PINN.trainable_weights)
+    sgd_opt.apply_gradients(zip(grads, PINN.trainable_weights))
