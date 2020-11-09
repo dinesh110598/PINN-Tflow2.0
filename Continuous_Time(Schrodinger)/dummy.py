@@ -1,3 +1,4 @@
+import math
 import numpy as np
 from tensorflow import keras as tfk
 from tensorflow import math as tfm
@@ -120,3 +121,36 @@ def train_bound (input_times):
                     tfm.pow(tfm.abs(h1-h2),2) + tfm.pow(tfm.abs(h1_x-h2_x),2))
     grads = tape.gradient(MSE, PINN.trainable_weights)
     sgd_opt.apply_gradients(zip(grads, PINN.trainable_weights))
+
+def training_loop (epochs, batch_size = 25, Ni = 50, Nb = 50, Nf = 20000):
+    """Randomly generates points on spacetime that PINN needs to train on
+    runs the training loop for PINN.
+
+    Args:
+        epochs (int): Number of epochs in training loop.
+        batch_size (int, optional): Size of training batch. Defaults to 25.
+        Ni (int, optional): Number of initial data. Defaults to 50.
+        Nb (int, optional): Number of boundary data. Defaults to 50.
+        Nf (int, optional): Number of collocation data. Defaults to 20000.
+    """
+    Ni_b = Ni // batch_size
+    Nb_b = Nb // batch_size
+    Nf_b = Nf // batch_size
+    data_len = Ni_b + Nb_b + Nf_b
+    pos = np.random.choice (data_len, 4, False)
+    init_pos = pos[:2]
+    bound_pos = pos[2:]
+
+    for _ in range (epochs):
+        for step in range (data_len):
+            if step in init_pos:
+                in_times = tf.zeros (batch_size)
+                in_pos = tf.random.uniform ((batch_size,), -5, 5)
+                train_init (tf.stack ([in_times, in_pos], -1))
+            elif step in bound_pos:
+                in_times = tf.random.uniform ((batch_size,), 0, math.pi/2)
+                train_bound (in_times)
+            else:
+                in_pos = tf.random.uniform((batch_size,), -5, 5)
+                in_times = tf.random.uniform((batch_size,), 0, math.pi/2)
+                train_colloc (tf.stack([in_times, in_pos], -1))
