@@ -10,7 +10,7 @@ def my_numpy_func(x):
 
 @tf.function
 def sech(x):
-    y = tf.numpy_function(my_numpy_func, [x], tf.complex)
+    tfm.reciprocal (tfm.cosh (x))
     return y
 
 @tf.function
@@ -65,7 +65,7 @@ def train_colloc (input_var):
         h_xx = tf_diag(tf.complex(h2_real[:, 1, :, 1], h2_imag[:, 1, :, 1]))
         j = tf.complex(0,1)
 
-        MSE = tfm.reduce_euclidean_norm( tfm.abs ((j*h_t) + (0.5*h_xx) + (tfm.conj(h)*h*h)) )
+        MSE = tfm.reduce_euclidean_norm(tfm.abs ((j*h_t) + (0.5*h_xx) + (tfm.conj(h)*h*h)))
     
     grads = tape.gradient (MSE, PINN.trainable_weights)
     sgd_opt.apply_gradients (zip(grads,PINN.trainable_weights))
