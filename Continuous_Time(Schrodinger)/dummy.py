@@ -4,18 +4,9 @@ from tensorflow import keras as tfk
 from tensorflow import math as tfm
 import tensorflow as tf
 
-#There's no hyperbolic secant op in Tensorflow so we're defining a custom one
-def my_numpy_func(x):
-    return np.reciprocal(np.cosh(x))
-
-@tf.function
-def sech(x):
-    tfm.reciprocal (tfm.cosh (x))
-    return y
-
 @tf.function
 def tf_diag (v, k=0):
-    y = tf.numpy_function(np.diag, [v,k], tf.float32)
+    y = tf.py_function(np.diag, [v,k], tf.float32)
     return y
 
 PINN = tfk.Sequential([
@@ -79,6 +70,9 @@ def train_init (input_var):
         input_var : A tf.Tensor of shape (batch_size,2). Components of second index
                     denote x and t. Value of t should always be 0.
     """
+    def sech(x):
+        return tfm.reciprocal(tfm.cosh(x))
+        
     with tf.GradientTape() as tape:
         h = PINN (input_var)
         MSE = tfm.reduce_euclidean_norm ( tfm.abs(h - sech(input_var[:,1])) )
